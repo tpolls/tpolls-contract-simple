@@ -1,0 +1,9 @@
+{
+  "projects": [
+    {
+      "name": "TPollsDapp",
+      "path": "./contracts/main.tact",
+      "output": "./build"
+    }
+  ]
+}
