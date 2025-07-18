@@ -106,12 +106,7 @@ async function testContract() {
         }
 
         console.log('\n✅ Contract testing completed successfully!');
-        
-        // Display contract usage information
-        console.log('\n📖 Contract Usage:');
-        console.log('To create a poll: Send CreatePoll message');
-        console.log('To vote: Send Vote message with pollId and optionIndex');
-        console.log('Available getters: getPoll, getPollResults, getPollCreator, getAllPolls, getPollCount');
+       
 
     } catch (error) {
         console.log('❌ Error testing contract:', error.message);

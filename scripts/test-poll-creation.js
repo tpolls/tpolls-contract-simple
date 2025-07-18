@@ -55,12 +55,13 @@ async function sendTonToContract(client, wallet, keyPair, contractAddress, amoun
     console.log(`✅ Transfer completed`);
 }
 
-async function createPoll(client, wallet, keyPair, contractAddress) {
+async function createPoll(client, wallet, keyPair, contractAddress, subject = "Test Poll Subject") {
     console.log('📝 Creating a new poll...');
     
-    // CreatePoll message body (opcode 958595215)
+    // CreatePoll message body (opcode 1060918784)
     const createPollBody = beginCell()
-        .storeUint(958595215, 32)  // CreatePoll opcode
+        .storeUint(1060918784, 32)  // CreatePoll opcode
+        .storeStringRefTail(subject)  // Poll subject
         .endCell();
     
     const message = internal({
@@ -96,11 +97,11 @@ async function createPoll(client, wallet, keyPair, contractAddress) {
 async function voteOnPoll(client, wallet, keyPair, contractAddress, pollId, optionIndex) {
     console.log(`🗳️  Voting on poll ${pollId}, option ${optionIndex}...`);
     
-    // Vote message body (opcode 1019817122)
+    // Vote message body (opcode 1011836453)
     const voteBody = beginCell()
-        .storeUint(1019817122, 32)  // Vote opcode
-        .storeUint(pollId, 64)      // pollId
-        .storeUint(optionIndex, 8)  // optionIndex
+        .storeUint(1011836453, 32)  // Vote opcode
+        .storeInt(pollId, 257)      // pollId
+        .storeInt(optionIndex, 257) // optionIndex
         .endCell();
     
     const message = internal({
@@ -189,7 +190,7 @@ async function testContractOperations() {
         }
 
         // Create a poll
-        await createPoll(client, wallet, keyPair, contractAddress);
+        await createPoll(client, wallet, keyPair, contractAddress, "Should TON have better DeFi ecosystem?");
         
         // Wait a bit for the transaction to be processed
         await new Promise(resolve => setTimeout(resolve, 10000));
@@ -198,8 +199,9 @@ async function testContractOperations() {
         console.log('\n🔍 Testing poll count after creation...');
         try {
             const pollCountResult = await client.runMethod(contractAddress, 'getPollCount');
-            if (pollCountResult.stack && pollCountResult.stack.remaining > 0) {
-                const pollCount = pollCountResult.stack.readBigNumber();
+            if (pollCountResult.stack) {
+                console.log('pollCountResult', pollCountResult.stack.items[0])
+                const pollCount = pollCountResult.stack.items[0].value.readBigNumber();
                 console.log('📊 Poll count after creation:', pollCount.toString());
                 
                 if (pollCount > 0n) {
@@ -215,8 +217,10 @@ async function testContractOperations() {
                         if (pollTuple) {
                             const pollId = pollTuple.readBigNumber();
                             const creator = pollTuple.readAddress();
+                            const subject = pollTuple.readString();
                             console.log('  📍 Poll ID:', pollId.toString());
                             console.log('  👤 Creator:', creator.toString());
+                            console.log('  📝 Subject:', subject);
                             console.log('  ✅ Creator matches wallet:', creator.toString() === wallet.address.toString());
                         }
                     } else {
