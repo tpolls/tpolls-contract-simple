@@ -5,11 +5,13 @@ struct Poll {
     pollId: Int;
     creator: Address;
     subject: String;
+    options: map<Int, Cell>;
     results: map<Int, Int>;
 }
 
 message CreatePoll {
     subject: String;
+    options: map<Int, Cell>;
 }
 
 message Vote {
@@ -34,6 +36,7 @@ contract TPollsDapp with Deployable, Ownable {
             pollId: self.pollCount,
             creator: sender(),
             subject: msg.subject,
+            options: msg.options,
             results: emptyMap()
         };
         
@@ -45,6 +48,9 @@ contract TPollsDapp with Deployable, Ownable {
         require(poll != null, "Poll does not exist");
         
         let currentPoll: Poll = poll!!;
+        let optionExists: Cell? = currentPoll.options.get(msg.optionIndex);
+        require(optionExists != null, "Option does not exist");
+        
         let currentVotes: Int? = currentPoll.results.get(msg.optionIndex);
         let votesToAdd: Int = 0;
         if (currentVotes != null) {
@@ -83,5 +89,11 @@ contract TPollsDapp with Deployable, Ownable {
         let poll: Poll? = self.polls.get(pollId);
         require(poll != null, "Poll does not exist");
         return poll!!.subject;
+    }
+    
+    get fun getPollOptions(pollId: Int): map<Int, Cell> {
+        let poll: Poll? = self.polls.get(pollId);
+        require(poll != null, "Poll does not exist");
+        return poll!!.options;
     }
 }
