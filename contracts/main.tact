@@ -10,12 +10,17 @@ struct Poll {
     totalVoters: Int;
     rewardPool: Int;
     rewardPerVote: Int;
+    jettonRewardWallet: Address?;
+    jettonRewardPool: Int;
+    jettonRewardPerVote: Int;
 }
 
 message CreatePoll {
     subject: String;
     options: map<Int, Cell>;
     rewardPerVote: Int;
+    jettonRewardWallet: Address?;
+    jettonRewardPerVote: Int;
 }
 
 message Vote {
@@ -25,6 +30,7 @@ message Vote {
 
 message ClaimReward {
     pollId: Int;
+    claimJetton: Bool;
 }
 
 message VoteEvent {
@@ -32,6 +38,29 @@ message VoteEvent {
     voter: Address;
     optionIndex: Int;
     timestamp: Int;
+}
+
+// Jetton-related messages
+message(0x7362d09c) JettonTransferNotification {
+    query_id: Int as uint64;
+    amount: Int as coins;
+    sender: Address;
+    forward_payload: Slice as remaining;
+}
+
+message(0x0f8a7ea5) JettonTransfer {
+    query_id: Int as uint64;
+    amount: Int as coins;
+    destination: Address;
+    response_destination: Address;
+    custom_payload: Cell?;
+    forward_ton_amount: Int as coins;
+    forward_payload: Slice as remaining;
+}
+
+message FundPoll {
+    pollId: Int;
+    isJetton: Bool;
 }
 
 contract TPollsDapp with Deployable, Ownable {
@@ -65,7 +94,10 @@ contract TPollsDapp with Deployable, Ownable {
             results: emptyMap(),
             totalVoters: 0,
             rewardPool: 0,
-            rewardPerVote: msg.rewardPerVote
+            rewardPerVote: msg.rewardPerVote,
+            jettonRewardWallet: msg.jettonRewardWallet,
+            jettonRewardPool: 0,
+            jettonRewardPerVote: msg.jettonRewardPerVote
         };
         
         self.polls.set(self.pollCount, poll);
@@ -117,25 +149,56 @@ contract TPollsDapp with Deployable, Ownable {
     receive(msg: ClaimReward) {
         let poll: Poll? = self.polls.get(msg.pollId);
         require(poll != null, "Poll does not exist");
-        
+
         let currentPoll: Poll = poll!!;
         let voter: Address = sender();
-        
+
         // Check if voter actually voted in this poll
         let voterPollKey: Int = self.createVoterPollKey(voter, msg.pollId);
         let hasVoted: Bool? = self.voterPollKeys.get(voterPollKey);
         require(hasVoted == true, "Did not vote in this poll");
-        
-        // Check if reward is available
-        require(currentPoll.rewardPerVote > 0, "No reward for this poll");
-        require(currentPoll.rewardPool >= currentPoll.rewardPerVote, "Insufficient reward pool");
-        
-        // Transfer reward (simplified - in practice you'd need proper TON transfer logic)
-        currentPoll.rewardPool = currentPoll.rewardPool - currentPoll.rewardPerVote;
+
+        if (msg.claimJetton) {
+            // Claim jetton reward
+            require(currentPoll.jettonRewardPerVote > 0, "No jetton reward for this poll");
+            require(currentPoll.jettonRewardPool >= currentPoll.jettonRewardPerVote, "Insufficient jetton reward pool");
+            require(currentPoll.jettonRewardWallet != null, "No jetton wallet configured");
+
+            // Send jetton transfer to voter
+            send(SendParameters{
+                to: currentPoll.jettonRewardWallet!!,
+                value: ton("0.05"),
+                mode: SendIgnoreErrors,
+                body: JettonTransfer{
+                    query_id: now(),
+                    amount: currentPoll.jettonRewardPerVote,
+                    destination: voter,
+                    response_destination: voter,
+                    custom_payload: null,
+                    forward_ton_amount: 0,
+                    forward_payload: emptySlice()
+                }.toCell()
+            });
+
+            // Update jetton reward pool
+            currentPoll.jettonRewardPool = currentPoll.jettonRewardPool - currentPoll.jettonRewardPerVote;
+        } else {
+            // Claim TON reward
+            require(currentPoll.rewardPerVote > 0, "No TON reward for this poll");
+            require(currentPoll.rewardPool >= currentPoll.rewardPerVote, "Insufficient TON reward pool");
+
+            // Send TON to voter
+            send(SendParameters{
+                to: voter,
+                value: currentPoll.rewardPerVote,
+                mode: SendIgnoreErrors
+            });
+
+            // Update TON reward pool
+            currentPoll.rewardPool = currentPoll.rewardPool - currentPoll.rewardPerVote;
+        }
+
         self.polls.set(msg.pollId, currentPoll);
-        
-        // Note: Actual TON transfer would be implemented here
-        // For now, we're just tracking the reward claim in the pool reduction
     }
     
     get fun getPoll(pollId: Int): Poll? {
@@ -197,5 +260,64 @@ contract TPollsDapp with Deployable, Ownable {
         require(poll != null, "Poll does not exist");
         return poll!!.rewardPerVote;
     }
-    
+
+    // Jetton-related getters
+    get fun getPollJettonRewardWallet(pollId: Int): Address? {
+        let poll: Poll? = self.polls.get(pollId);
+        require(poll != null, "Poll does not exist");
+        return poll!!.jettonRewardWallet;
+    }
+
+    get fun getPollJettonRewardPool(pollId: Int): Int {
+        let poll: Poll? = self.polls.get(pollId);
+        require(poll != null, "Poll does not exist");
+        return poll!!.jettonRewardPool;
+    }
+
+    get fun getPollJettonRewardPerVote(pollId: Int): Int {
+        let poll: Poll? = self.polls.get(pollId);
+        require(poll != null, "Poll does not exist");
+        return poll!!.jettonRewardPerVote;
+    }
+
+    // Handle jetton transfer notifications for funding polls
+    receive(msg: JettonTransferNotification) {
+        // Parse forward payload for poll funding
+        if (msg.forward_payload.bits() >= 32) {
+            let forwardSlice: Slice = msg.forward_payload;
+            let op: Int = forwardSlice.loadUint(32);
+
+            if (op == 0x46756E64) { // "Fund" opcode
+                let pollId: Int = forwardSlice.loadUint(32);
+                let isJetton: Bool = forwardSlice.loadBool();
+
+                if (isJetton) {
+                    let poll: Poll? = self.polls.get(pollId);
+                    require(poll != null, "Poll does not exist");
+
+                    let currentPoll: Poll = poll!!;
+                    currentPoll.jettonRewardPool = currentPoll.jettonRewardPool + msg.amount;
+                    self.polls.set(pollId, currentPoll);
+                }
+            }
+        }
+    }
+
+    // Handle direct poll funding with TON
+    receive(msg: FundPoll) {
+        let poll: Poll? = self.polls.get(msg.pollId);
+        require(poll != null, "Poll does not exist");
+
+        let currentPoll: Poll = poll!!;
+
+        if (!msg.isJetton) {
+            // Add to TON reward pool (subtract gas costs)
+            let rewardAmount: Int = context().value - ton("0.01"); // Reserve 0.01 TON for gas
+            require(rewardAmount > 0, "Insufficient funding amount");
+
+            currentPoll.rewardPool = currentPoll.rewardPool + rewardAmount;
+            self.polls.set(msg.pollId, currentPoll);
+        }
+    }
+
 }

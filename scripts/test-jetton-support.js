@@ -3,7 +3,7 @@ const { TonClient } = require('@ton/ton');
 
 // Test configuration
 const TESTNET_ENDPOINT = 'https://testnet.toncenter.com/api/v2/jsonRPC';
-const CONTRACT_ADDRESS = 'EQBTTSiLga3dkYVTrKNFQYxat2UBTkL2RxGOGp4vqjMdPdTG'; // Update with new jetton-enabled contract
+const CONTRACT_ADDRESS = 'EQDAfR3FUXGaTXTT-o_C5xNRL9_a2P-QmoCyBPLsGPcPu7iZ'; // New jetton-enabled contract
 
 async function testJettonSupport() {
   console.log('🧪 Testing Jetton Support in Polls Contract...\n');

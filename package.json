@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "tact --config ./tact.config.json",
+    "build:tolk": "node scripts/build-tolk.js",
     "test": "jest",
     "test:integration": "jest tests/integration.test.js",
     "test:contract": "node scripts/test-contract.js",
@@ -13,20 +14,27 @@
     "deploy": "npm run build && node scripts/deploy.js",
     "deploy:testnet": "npm run build && node scripts/deploy.js --testnet"
   },
-  "keywords": ["ton", "tact", "smart-contract", "polls", "dapp"],
+  "keywords": [
+    "ton",
+    "tact",
+    "smart-contract",
+    "polls",
+    "dapp"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "@tact-lang/compiler": "^1.4.0",
     "@ton/core": "^0.56.0",
     "@ton/crypto": "^3.2.0",
-    "@ton/ton": "^14.0.0",
     "@ton/sandbox": "^0.15.0",
-    "jest": "^29.7.0",
-    "dotenv": "^16.4.5"
+    "@ton/ton": "^14.0.0",
+    "dotenv": "^16.4.5",
+    "jest": "^29.7.0"
   },
   "dependencies": {
     "@ton/core": "^0.56.0",
-    "@ton/crypto": "^3.2.0"
+    "@ton/crypto": "^3.2.0",
+    "@ton/tolk-js": "^1.0.0"
   }
 }
