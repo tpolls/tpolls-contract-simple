@@ -9,6 +9,7 @@
     "test:integration": "jest tests/integration.test.js",
     "test:contract": "node scripts/test-contract.js",
     "test:poll": "node scripts/test-poll-creation.js",
+    "test:poll-creator": "node scripts/test-poll-creator.js",
     "deploy": "npm run build && node scripts/deploy.js",
     "deploy:testnet": "npm run build && node scripts/deploy.js --testnet"
   },
